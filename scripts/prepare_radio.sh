@@ -9,8 +9,10 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 sdk_init
 require_sdk
 ensure_lcpi_base
+restore_radio_assets
+apply_radio_identity
 
 note "LCPI radio profile selected"
 note "  config: $CFG_DIR/$LCPI_BASE_CFG"
 note "  DTS:    $DTS_DIR/$LCPI_DTS"
-note "  radio:  vcpd transport=radiod, mon0 ch6, node=1"
+note "  radio:  vcpd transport=radiod, mon0 ch6, node=$RADIO_NODE_ID"

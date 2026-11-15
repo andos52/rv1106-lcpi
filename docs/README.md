@@ -19,6 +19,7 @@ USB **AR9271** + `ath9k_htc`/`ath9ku` + `radiod`/ULAMA + `vcpd
 - `12-pi4joy.md` — вторая прошивка: замена Pi4Joy (приоритет)
 - `13-измерения.md` — UART, RAM/CMA, NAND, USB, Ethernet, камера
 - `14-сеть-адреса.md` — IP НСУ/Pi4Joy/бортов и сервисов
+- `15-радио.md` — радио-прошивка дрона: сборка, проверки, риски
 
 ## Текущее состояние
 - Прошит bring-up образ (luxfox), проверен по UART: Linux, root/luckfox,

@@ -9,6 +9,8 @@ DEFAULT_SDK_DIR="${HOME}/rv1106-sdk/bort4g-radio"
 JOY_NODE_ID="${JOY_NODE_ID:-251}"
 JOY_SOURCE="${JOY_SOURCE:-pi4joy}"
 JOY_IMAGE_NAME="${JOY_IMAGE_NAME:-lcpi-joy.img}"
+RADIO_NODE_ID="${RADIO_NODE_ID:-1}"
+RADIO_IMAGE_NAME="${RADIO_IMAGE_NAME:-lcpi-radio.img}"
 
 LCPI_BASE_CFG="BoardConfig-SPI_NAND-Buildroot-RV1106_LCPI_RV1106-IPC.mk"
 LCPI_JOY_CFG="BoardConfig-SPI_NAND-Buildroot-RV1106_LCPI_JOY-IPC.mk"
@@ -86,6 +88,40 @@ ensure_lcpi_base() {
     select_board "$LCPI_BASE_CFG"
     skip_media_samples
     fix_e2fs_dirs
+}
+
+# Restore the radio scripts that clean_radio_assets renamed during a joy build.
+restore_radio_assets() {
+    local f
+    for f in \
+        "$SDK_DIR/media/radiod/scripts/S96radiod" \
+        "$SDK_DIR/media/unow/scripts/S99unow-signal-diag"; do
+        if [ -f "$f.disabled" ]; then
+            mv "$f.disabled" "$f"
+        fi
+    done
+}
+
+# Radio node identity: one of the drone nodes (default 1), not the joy .251.
+apply_radio_identity() {
+    local files
+    files="$(find \
+        "$SDK_DIR/media/out" \
+        "$SDK_DIR/media/radiod/out" \
+        "$SDK_DIR/media/radiod/defaults" \
+        "$SDK_DIR/output/out" \
+        -name radiod.conf -type f 2>/dev/null || true)"
+    if [ -n "$files" ]; then
+        while IFS= read -r f; do
+            [ -n "$f" ] && sed -i "s/^node_id=.*/node_id=$RADIO_NODE_ID/" "$f"
+        done <<< "$files"
+    fi
+}
+
+# Remove Pi4Joy-only files if a joy build previously populated the rootfs.
+clean_joy_assets() {
+    rm -rf "$ROOTFS/opt/pi4joy" "$ROOTFS/etc/pi4joy"
+    rm -f "$ROOTFS/etc/init.d/S95pi4joy"
 }
 
 # Force the previous Pi4Joy identity everywhere the image or runtime reads it.
