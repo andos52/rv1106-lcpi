@@ -3,7 +3,7 @@
 # does not honor DESTDIR, so pre-create the destination directories.
 # Idempotent; safe to run before any build.
 
-SDK="${SDK_DIR:-$HOME/rv1106-sdk/bort4g-radio}"
+SDK="${SDK_DIR:-$HOME/rv1106-sdk/bort4g-joy}"
 BR_ROOT="$SDK/sysdrv/source/buildroot"
 BR="$(find "$BR_ROOT" -maxdepth 1 -mindepth 1 -type d -name 'buildroot-*' 2>/dev/null | sort -V | tail -1)"
 BR="${BR:-$BR_ROOT/buildroot-2023.02.6}"
@@ -32,3 +32,4 @@ for loc in $LOCALES; do
 done
 
 echo "fix-e2fs-dirs: OK ($SYSROOT, $TARGET)"
+

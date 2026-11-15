@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
-# Prepare the LCPI_JOY profile (Pi4Joy replacement):
-# DWC3 host + USB HID + evdev + eudev, CMA 32M.
+# Prepare the LCPI_JOY board profile: USB host/HID, eudev, CMA 32M.
 
 set -euo pipefail
-LOG_PREFIX="prepare-joy"
+LOG_PREFIX="prepare"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
 sdk_init
 require_sdk
 ensure_lcpi_base
-minimize_joy_services
 
 note "installing LCPI DTS (USB host)"
 cp "$PROJECT_ROOT/board/dts/$LCPI_DTS" "$DTS_DIR/$LCPI_DTS"
@@ -45,7 +43,4 @@ if [ ! -f "$PROJECT_ROOT/firmware/pi4joy/etc/pi4joy/env" ]; then
     cp "$PROJECT_ROOT/firmware/pi4joy/etc/pi4joy/env.example" "$PROJECT_ROOT/firmware/pi4joy/etc/pi4joy/env"
 fi
 
-note "done"
-note "  profile: $CFG_DIR/$LCPI_JOY_CFG"
-note "  buildroot: luckfox_pico_joy_defconfig (eudev)"
-note "  DTS: dr_mode=host, CMA 32M"
+note "done: $CFG_DIR/$LCPI_JOY_CFG"

@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
-# Shared helpers for the RV1106 project scripts.
-#
-# This file is sourced, never executed. Callers keep `set -euo pipefail`.
+# Shared helpers for the LCPI-RV1106 joystick project.
+# Sourced by scripts; callers keep `set -euo pipefail`.
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-DEFAULT_SDK_DIR="${HOME}/rv1106-sdk/bort4g-radio"
+DEFAULT_SDK_DIR="${HOME}/rv1106-sdk/bort4g-joy"
 
-JOY_NODE_ID="${JOY_NODE_ID:-251}"
-JOY_SOURCE="${JOY_SOURCE:-pi4joy}"
-JOY_IMAGE_NAME="${JOY_IMAGE_NAME:-lcpi-joy.img}"
-RADIO_NODE_ID="${RADIO_NODE_ID:-1}"
-RADIO_IMAGE_NAME="${RADIO_IMAGE_NAME:-lcpi-radio.img}"
+NODE_IP="${NODE_IP:-192.168.127.251}"
+NODE_PREFIX="${NODE_PREFIX:-24}"
+SOURCE="${SOURCE:-pi4joy}"
+IMAGE_NAME="${IMAGE_NAME:-lcpi-joy.img}"
 
 LCPI_BASE_CFG="BoardConfig-SPI_NAND-Buildroot-RV1106_LCPI_RV1106-IPC.mk"
 LCPI_JOY_CFG="BoardConfig-SPI_NAND-Buildroot-RV1106_LCPI_JOY-IPC.mk"
 PRO_MAX_CFG="BoardConfig-SPI_NAND-Buildroot-RV1106_Luckfox_Pico_Pro_Max-IPC.mk"
 LCPI_DTS="rv1106g-lcpi-rv1106.dts"
 
-JOY_RADIO_SERVICES="S21appinit S39wifi S50usbdevice S60micinit S90usb-watchdog S96radiod S99usb0config S99hciinit"
+NON_JOY_SERVICES="S21appinit S39wifi S41eth0-static S41dhcpcd S50usbdevice \
+S60micinit S90usb-watchdog S96radiod S99buildspot-ssh S99hciinit S99python \
+S99usb0config S50telnet"
 
 die() { printf '%s: ERROR: %s\n' "${LOG_PREFIX:-rv1106}" "$*" >&2; exit 1; }
 note() { printf '%s: %s\n' "${LOG_PREFIX:-rv1106}" "$*"; }
@@ -43,13 +43,8 @@ require_sdk() {
     [ -x "$SDK_DIR/build.sh" ] || die "SDK build.sh not found: $SDK_DIR/build.sh"
 }
 
-require_file() {
-    [ -f "$1" ] || die "missing file: $1"
-}
-
-require_dir() {
-    [ -d "$1" ] || die "missing directory: $1"
-}
+require_file() { [ -f "$1" ] || die "missing file: $1"; }
+require_dir() { [ -d "$1" ] || die "missing directory: $1"; }
 
 select_board() {
     local cfg="$1"
@@ -67,8 +62,7 @@ fix_e2fs_dirs() {
     SDK_DIR="$SDK_DIR" bash "$PROJECT_ROOT/scripts/fix-e2fs-dirs.sh"
 }
 
-# Create the shared LCPI base profile and install the board DTS. Safe to call
-# from both the radio and the joy preparation steps, including a fresh SDK.
+# Create the shared LCPI base profile (SPI NAND, CMA 32M, host USB) and the DTS.
 ensure_lcpi_base() {
     require_file "$CFG_DIR/$PRO_MAX_CFG"
     require_file "$PROJECT_ROOT/board/dts/$LCPI_DTS"
@@ -90,50 +84,16 @@ ensure_lcpi_base() {
     fix_e2fs_dirs
 }
 
-# Restore the radio scripts that clean_radio_assets renamed during a joy build.
-restore_radio_assets() {
-    local f
-    for f in \
-        "$SDK_DIR/media/radiod/scripts/S96radiod" \
-        "$SDK_DIR/media/unow/scripts/S99unow-signal-diag" \
-        "$SDK_DIR/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-init/etc/init.d/S60micinit" \
-        "$SDK_DIR/media/usb-watchdog/scripts/S90usb-watchdog" \
-        "$SDK_DIR/media/buildspot/S99buildspot-ssh"; do
-        if [ -f "$f.disabled" ]; then
-            mv "$f.disabled" "$f"
-        fi
-    done
-    if [ -f "$OEM/usr/bin/RkLunch.sh.disabled" ]; then
-        mv "$OEM/usr/bin/RkLunch.sh.disabled" "$OEM/usr/bin/RkLunch.sh"
+# Identity sent to the NSU. The physical-port->slot mapping is baked into
+# /opt/pi4joy/slots.default.json and does not depend on this.
+apply_identity() {
+    if [ -f "$ROOTFS/etc/pi4joy/env" ]; then
+        sed -i "s/^PI4JOY_NSU_SOURCE=.*/PI4JOY_NSU_SOURCE=$SOURCE/" "$ROOTFS/etc/pi4joy/env"
     fi
 }
 
-# Radio node identity: one of the drone nodes (default 1), not the joy .251.
-apply_radio_identity() {
-    local files
-    files="$(find \
-        "$SDK_DIR/media/out" \
-        "$SDK_DIR/media/radiod/out" \
-        "$SDK_DIR/media/radiod/defaults" \
-        "$SDK_DIR/output/out" \
-        -name radiod.conf -type f 2>/dev/null || true)"
-    if [ -n "$files" ]; then
-        while IFS= read -r f; do
-            [ -n "$f" ] && sed -i "s/^node_id=.*/node_id=$RADIO_NODE_ID/" "$f"
-        done <<< "$files"
-    fi
-}
-
-# Remove Pi4Joy-only files if a joy build previously populated the rootfs.
-clean_joy_assets() {
-    rm -rf "$ROOTFS/opt/pi4joy" "$ROOTFS/etc/pi4joy"
-    rm -f "$ROOTFS/etc/init.d/S95pi4joy"
-}
-
-# Disable base/radio services that are not needed on the joystick board.
-# Source files are renamed so a later allsave/firmware pass cannot restore
-# them; staging copies are removed as well.
-minimize_joy_services() {
+# Remove non-joystick services and generated copies from the joy image.
+strip_non_joy_assets() {
     local src
     for src in \
         "$SDK_DIR/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-init/etc/init.d/S60micinit" \
@@ -141,37 +101,29 @@ minimize_joy_services() {
         "$SDK_DIR/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-init/etc/init.d/S99usb0config" \
         "$SDK_DIR/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-tiny/etc/init.d/S99usb0config" \
         "$SDK_DIR/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-init/etc/init.d/S99hciinit" \
-        "$SDK_DIR/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-tiny/etc/init.d/S99hciinit" \
-        "$SDK_DIR/sysdrv/tools/board/android-tools/out/etc/init.d/S50usbdevice"; do
+        "$SDK_DIR/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-tiny/etc/init.d/S99hciinit"; do
         if [ -f "$src" ]; then
             mv "$src" "$src.disabled"
         fi
     done
 
-    # Runtime copies that the media/tools build put into staging. The source
-    # templates must stay intact (their Makefiles copy them), so remove only
-    # the generated copies before the final repack.
-    for src in \
-        "$SDK_DIR/media/out/bin/S99buildspot-ssh" \
-        "$SDK_DIR/media/out/root/etc/init.d/S99buildspot-ssh" \
-        "$SDK_DIR/output/out/media_out/root/etc/init.d/S99buildspot-ssh" \
-        "$SDK_DIR/output/out/S21appinit" \
-        "$SDK_DIR/media/out/root/etc/init.d/S90usb-watchdog" \
-        "$SDK_DIR/media/out/etc/init.d/S90usb-watchdog" \
-        "$SDK_DIR/output/out/media_out/root/etc/init.d/S90usb-watchdog" \
-        "$SDK_DIR/output/out/media_out/etc/init.d/S90usb-watchdog" \
-        "$SDK_DIR/sysdrv/out/rootfs_uclibc_rv1106/etc/init.d/S50usbdevice"; do
-        rm -f "$src"
-    done
-
     local s
-    for s in S21appinit S50usbdevice S60micinit S90usb-watchdog \
-             S99usb0config S99hciinit S99python S99buildspot-ssh S50telnet; do
+    for s in $NON_JOY_SERVICES; do
         [ -d "$ROOTFS/etc/init.d" ] && rm -f "$ROOTFS/etc/init.d/$s"
         [ -d "$OEM/etc/init.d" ] && rm -f "$OEM/etc/init.d/$s"
     done
 
-    # Vendor RkLunch starts camera/radio/media helpers. Joy must not run them.
+    rm -f \
+        "$SDK_DIR/media/out/bin/S99buildspot-ssh" \
+        "$SDK_DIR/media/out/root/etc/init.d/S99buildspot-ssh" \
+        "$SDK_DIR/media/out/root/etc/init.d/S90usb-watchdog" \
+        "$SDK_DIR/media/out/etc/init.d/S90usb-watchdog" \
+        "$SDK_DIR/output/out/media_out/root/etc/init.d/S90usb-watchdog" \
+        "$SDK_DIR/output/out/media_out/etc/init.d/S90usb-watchdog" \
+        "$SDK_DIR/output/out/S21appinit" \
+        "$SDK_DIR/sysdrv/tools/board/android-tools/out/etc/init.d/S50usbdevice" \
+        "$SDK_DIR/sysdrv/out/rootfs_uclibc_rv1106/etc/init.d/S50usbdevice"
+
     if [ -f "$OEM/usr/bin/RkLunch.sh" ]; then
         mv "$OEM/usr/bin/RkLunch.sh" "$OEM/usr/bin/RkLunch.sh.disabled"
     fi
@@ -181,79 +133,30 @@ minimize_joy_services() {
     fi
 }
 
-# Force the previous Pi4Joy identity everywhere the image or runtime reads it.
-apply_joy_identity() {
-    local files
-    files="$(find \
-        "$SDK_DIR/media/out" \
-        "$SDK_DIR/media/radiod/out" \
-        "$SDK_DIR/media/radiod/defaults" \
-        "$SDK_DIR/output/out" \
-        -name radiod.conf -type f 2>/dev/null || true)"
-    if [ -n "$files" ]; then
-        while IFS= read -r f; do
-            [ -n "$f" ] && sed -i "s/^node_id=.*/node_id=$JOY_NODE_ID/" "$f"
-        done <<< "$files"
-    fi
-    if [ -f "$ROOTFS/etc/pi4joy/env" ]; then
-        sed -i "s/^PI4JOY_NSU_SOURCE=.*/PI4JOY_NSU_SOURCE=$JOY_SOURCE/" "$ROOTFS/etc/pi4joy/env"
-    fi
-}
-
-# Remove assets that the media build would otherwise put back into the image.
-clean_radio_assets() {
-    local f
-    for f in \
-        "$SDK_DIR/media/out/root/etc/init.d/S96radiod" \
-        "$SDK_DIR/media/out/etc/init.d/S96radiod" \
-        "$SDK_DIR/media/out/bin/S99unow-signal-diag" \
-        "$SDK_DIR/media/radiod/out/root/etc/init.d/S96radiod" \
-        "$SDK_DIR/media/radiod/out/etc/init.d/S96radiod" \
-        "$SDK_DIR/media/unow/out/bin/S99unow-signal-diag" \
-        "$SDK_DIR/output/out/media_out/root/etc/init.d/S96radiod" \
-        "$SDK_DIR/output/out/media_out/etc/init.d/S96radiod" \
-        "$SDK_DIR/output/out/media_out/bin/S99unow-signal-diag"; do
-        rm -f "$f"
-    done
-    for f in "$SDK_DIR/media/radiod/scripts/S96radiod" "$SDK_DIR/media/unow/scripts/S99unow-signal-diag"; do
-        if [ -f "$f" ]; then
-            mv "$f" "$f.disabled"
-        fi
-    done
-}
-
 inject_joy_payload() {
     require_dir "$ROOTFS"
     require_file "$PROJECT_ROOT/firmware/pi4joy/opt/pi4joy/pi4joy"
 
-    note "injecting pi4joy overlay"
+    note "injecting pi4joy payload"
     rsync -a "$PROJECT_ROOT/firmware/pi4joy/" "$ROOTFS/"
-    chmod +x "$ROOTFS/opt/pi4joy/pi4joy" "$ROOTFS/etc/init.d/S95pi4joy"
+    chmod +x \
+        "$ROOTFS/opt/pi4joy/pi4joy" \
+        "$ROOTFS/etc/init.d/S95pi4joy" \
+        "$ROOTFS/etc/init.d/S41net"
 
-    apply_joy_identity
-
-    local static_if="$SDK_DIR/project/overlay/etc/init.d/S41eth0-static"
-    require_file "$static_if"
-    cp "$static_if" "$ROOTFS/etc/init.d/S41eth0-static"
-    chmod +x "$ROOTFS/etc/init.d/S41eth0-static"
-
-    local s
-    for s in $JOY_RADIO_SERVICES; do
-        rm -f "$ROOTFS/etc/init.d/$s"
-    done
-    rm -f "$OEM/etc/init.d/S96radiod" "$OEM/etc/init.d/S99unow-signal-diag"
-    minimize_joy_services
-    clean_radio_assets
+    apply_identity
+    strip_non_joy_assets
 }
 
-repack_joy_image() {
+repack_image() {
     note "repacking firmware"
     ( cd "$SDK_DIR" && CMAKE_POLICY_VERSION_MINIMUM=3.5 ./build.sh firmware )
     require_file "$UPDATE_IMG"
 
     mkdir -p "$DIST"
-    cp "$UPDATE_IMG" "$DIST/$JOY_IMAGE_NAME"
-    ( cd "$DIST" && sha256sum "$JOY_IMAGE_NAME" > "$JOY_IMAGE_NAME.sha256" )
-    note "image: $DIST/$JOY_IMAGE_NAME"
-    cat "$DIST/$JOY_IMAGE_NAME.sha256"
+    cp "$UPDATE_IMG" "$DIST/$IMAGE_NAME"
+    ( cd "$DIST" && sha256sum "$IMAGE_NAME" > "$IMAGE_NAME.sha256" )
+    note "image: $DIST/$IMAGE_NAME"
+    cat "$DIST/$IMAGE_NAME.sha256"
 }
+
