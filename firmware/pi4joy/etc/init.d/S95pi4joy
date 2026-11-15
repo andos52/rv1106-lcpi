@@ -9,6 +9,10 @@ case "$1" in
     start)
         [ -x "$DAEMON" ] || exit 0
         mkdir -p "$DATA_DIR" /var/log
+        # Stable physical-port -> slot mapping survives a reflash of userdata.
+        if [ ! -f "$DATA_DIR/slots.json" ] && [ -f /opt/pi4joy/slots.default.json ]; then
+            cp /opt/pi4joy/slots.default.json "$DATA_DIR/slots.json"
+        fi
         [ -f "$ENV_FILE" ] && . "$ENV_FILE"
         start-stop-daemon -S -q -b -x "$DAEMON" -- \
             -listen 0.0.0.0:8090 \

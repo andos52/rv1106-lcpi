@@ -9,6 +9,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 sdk_init
 require_sdk
 ensure_lcpi_base
+minimize_joy_services
 
 note "installing LCPI DTS (USB host)"
 cp "$PROJECT_ROOT/board/dts/$LCPI_DTS" "$DTS_DIR/$LCPI_DTS"

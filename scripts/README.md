@@ -12,6 +12,7 @@
 - `fix-e2fs-dirs.sh` — обход e2fsprogs/coreutils на Ubuntu 26.04.
 - `status.sh` — прогресс сборки и выбранный профиль.
 - `check.sh` — синтаксис shell/python и базовые проверки без SDK.
+- `joy_replug_test.sh` — замер появления пультов (запускать на плате).
 - `lib/common.sh` — общие функции и константы (не запускать напрямую).
 
 ## Bring-up и история

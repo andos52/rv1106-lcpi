@@ -95,11 +95,17 @@ restore_radio_assets() {
     local f
     for f in \
         "$SDK_DIR/media/radiod/scripts/S96radiod" \
-        "$SDK_DIR/media/unow/scripts/S99unow-signal-diag"; do
+        "$SDK_DIR/media/unow/scripts/S99unow-signal-diag" \
+        "$SDK_DIR/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-init/etc/init.d/S60micinit" \
+        "$SDK_DIR/media/usb-watchdog/scripts/S90usb-watchdog" \
+        "$SDK_DIR/media/buildspot/S99buildspot-ssh"; do
         if [ -f "$f.disabled" ]; then
             mv "$f.disabled" "$f"
         fi
     done
+    if [ -f "$OEM/usr/bin/RkLunch.sh.disabled" ]; then
+        mv "$OEM/usr/bin/RkLunch.sh.disabled" "$OEM/usr/bin/RkLunch.sh"
+    fi
 }
 
 # Radio node identity: one of the drone nodes (default 1), not the joy .251.
@@ -122,6 +128,57 @@ apply_radio_identity() {
 clean_joy_assets() {
     rm -rf "$ROOTFS/opt/pi4joy" "$ROOTFS/etc/pi4joy"
     rm -f "$ROOTFS/etc/init.d/S95pi4joy"
+}
+
+# Disable base/radio services that are not needed on the joystick board.
+# Source files are renamed so a later allsave/firmware pass cannot restore
+# them; staging copies are removed as well.
+minimize_joy_services() {
+    local src
+    for src in \
+        "$SDK_DIR/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-init/etc/init.d/S60micinit" \
+        "$SDK_DIR/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-init/etc/init.d/S99python" \
+        "$SDK_DIR/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-init/etc/init.d/S99usb0config" \
+        "$SDK_DIR/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-tiny/etc/init.d/S99usb0config" \
+        "$SDK_DIR/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-init/etc/init.d/S99hciinit" \
+        "$SDK_DIR/project/cfg/BoardConfig_IPC/overlay/overlay-luckfox-buildroot-tiny/etc/init.d/S99hciinit" \
+        "$SDK_DIR/sysdrv/tools/board/android-tools/out/etc/init.d/S50usbdevice"; do
+        if [ -f "$src" ]; then
+            mv "$src" "$src.disabled"
+        fi
+    done
+
+    # Runtime copies that the media/tools build put into staging. The source
+    # templates must stay intact (their Makefiles copy them), so remove only
+    # the generated copies before the final repack.
+    for src in \
+        "$SDK_DIR/media/out/bin/S99buildspot-ssh" \
+        "$SDK_DIR/media/out/root/etc/init.d/S99buildspot-ssh" \
+        "$SDK_DIR/output/out/media_out/root/etc/init.d/S99buildspot-ssh" \
+        "$SDK_DIR/output/out/S21appinit" \
+        "$SDK_DIR/media/out/root/etc/init.d/S90usb-watchdog" \
+        "$SDK_DIR/media/out/etc/init.d/S90usb-watchdog" \
+        "$SDK_DIR/output/out/media_out/root/etc/init.d/S90usb-watchdog" \
+        "$SDK_DIR/output/out/media_out/etc/init.d/S90usb-watchdog" \
+        "$SDK_DIR/sysdrv/out/rootfs_uclibc_rv1106/etc/init.d/S50usbdevice"; do
+        rm -f "$src"
+    done
+
+    local s
+    for s in S21appinit S50usbdevice S60micinit S90usb-watchdog \
+             S99usb0config S99hciinit S99python S99buildspot-ssh S50telnet; do
+        [ -d "$ROOTFS/etc/init.d" ] && rm -f "$ROOTFS/etc/init.d/$s"
+        [ -d "$OEM/etc/init.d" ] && rm -f "$OEM/etc/init.d/$s"
+    done
+
+    # Vendor RkLunch starts camera/radio/media helpers. Joy must not run them.
+    if [ -f "$OEM/usr/bin/RkLunch.sh" ]; then
+        mv "$OEM/usr/bin/RkLunch.sh" "$OEM/usr/bin/RkLunch.sh.disabled"
+    fi
+    if [ -f "$ROOTFS/etc/init.d/S21appinit" ]; then
+        printf '#!/bin/sh\nexit 0\n' > "$ROOTFS/etc/init.d/S21appinit"
+        chmod +x "$ROOTFS/etc/init.d/S21appinit"
+    fi
 }
 
 # Force the previous Pi4Joy identity everywhere the image or runtime reads it.
@@ -185,6 +242,7 @@ inject_joy_payload() {
         rm -f "$ROOTFS/etc/init.d/$s"
     done
     rm -f "$OEM/etc/init.d/S96radiod" "$OEM/etc/init.d/S99unow-signal-diag"
+    minimize_joy_services
     clean_radio_assets
 }
 
