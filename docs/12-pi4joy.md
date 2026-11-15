@@ -69,9 +69,9 @@ PI4JOY_TOKEN=<локальный токен, опционально>
   `USB_HID`/`HID_GENERIC`/`EVDEV`, eudev (`by-path`), CMA 32M,
   профиль `LCPI_JOY`.
 - Overlay: `S95pi4joy`, `/etc/pi4joy/env`, `/opt/pi4joy`.
-- Чистый образ: `dist/lcpi-joy.img` (SHA256 `345815c1…63cf544`),
+- Чистый образ: `dist/lcpi-joy.img` (SHA256 `15112820…f7246e9`),
   `node_id=251` (IP `.251`), `source=pi4joy`, слоты запечены,
-  radio/gadget/camera-сервисы убраны.
+  radio/gadget/camera-сервисы убраны, pi4joy с idle-фиксом.
 - **Проверено:** TX12 напрямую → `online:1`; НСУ видит
   `remote-pi4joy-1`, `AssignedDroneID=1`.
 - Через питаемый хаб стик не определялся — нужен data-порт/кабель.
