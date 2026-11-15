@@ -92,3 +92,5 @@ scripts/        prepare/build/flash, status, check, lib/common.sh
 - `docs/12-pi4joy.md` — прошивка-замена Pi4Joy (приоритет)
 - `docs/13-измерения.md` — измерения UART/RAM/NAND/USB
 - `docs/14-сеть-адреса.md` — IP НСУ/Pi4Joy/бортов
+- `docs/15-радио.md` — радио-прошивка дрона
+- `docs/16-сравнение-luckfox.md` — сравнение с Luckfox Pico Ultra
