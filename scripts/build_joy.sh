@@ -1,53 +1,47 @@
 #!/usr/bin/env bash
-# Build the Pi4Joy replacement image (LCPI_JOY): USB host/HID + eudev + pi4joy.
-# Run inside WSL/Linux.
+# Build the Pi4Joy replacement image (LCPI_JOY).
+#
+#   build_joy.sh                 prepare + full SDK build + inject + repack
+#   build_joy.sh --repack-only   reuse the existing rootfs, inject + repack
+#   build_joy.sh --skip-prepare  do not touch the SDK profile first
 
 set -euo pipefail
+LOG_PREFIX="build-joy"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SDK_DIR="${SDK_DIR:-$HOME/rv1106-sdk/bort4g-radio}"
-DIST="$ROOT/dist"
-ROOTFS="$SDK_DIR/output/out/rootfs_uclibc_rv1106"
+REPACK_ONLY=0
+SKIP_PREPARE=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --repack-only) REPACK_ONLY=1; shift ;;
+        --skip-prepare) SKIP_PREPARE=1; shift ;;
+        -h|--help)
+            cat <<'EOF'
+Usage: build_joy.sh [--repack-only] [--skip-prepare]
 
-die() { echo "build-joy: ERROR: $*" >&2; exit 1; }
-note() { echo "build-joy: $*"; }
+  --repack-only   skip ./build.sh allsave and reuse output/out/rootfs*
+  --skip-prepare  do not regenerate the LCPI_JOY profile
+  -h, --help      this help
 
-[ -x "$SDK_DIR/build.sh" ] || die "SDK not found: $SDK_DIR"
-[ -f "$ROOT/firmware/pi4joy/opt/pi4joy/pi4joy" ] || die "pi4joy binary missing"
-
-"$ROOT/scripts/prepare_joy.sh"
-
-note "building SDK (allsave)"
-( cd "$SDK_DIR" && CMAKE_POLICY_VERSION_MINIMUM=3.5 ./build.sh allsave )
-
-[ -d "$ROOTFS" ] || die "rootfs staging not found: $ROOTFS"
-
-note "injecting pi4joy overlay"
-rsync -a "$ROOT/firmware/pi4joy/" "$ROOTFS/"
-chmod +x "$ROOTFS/opt/pi4joy/pi4joy" "$ROOTFS/etc/init.d/S95pi4joy"
-
-# Same identity as the previous pi4joy: 192.168.127.251, source "pi4joy".
-OEM="$SDK_DIR/output/out/oem"
-SDK_DIR="$SDK_DIR" sh "$ROOT/scripts/set_joy_identity.sh"
-if [ -f "$OEM/etc/radiod.conf" ]; then
-    sed -i 's/^node_id=.*/node_id=251/' "$OEM/etc/radiod.conf"
-fi
-sed -i 's/^PI4JOY_NSU_SOURCE=.*/PI4JOY_NSU_SOURCE=pi4joy/' "$ROOTFS/etc/pi4joy/env"
-cp "$SDK_DIR/project/overlay/etc/init.d/S41eth0-static" "$ROOTFS/etc/init.d/S41eth0-static"
-chmod +x "$ROOTFS/etc/init.d/S41eth0-static"
-
-# Radio/gadget/camera services are not used on the joystick image.
-for s in S21appinit S39wifi S50usbdevice S60micinit \
-         S90usb-watchdog S96radiod S99usb0config S99hciinit; do
-    rm -f "$ROOTFS/etc/init.d/$s"
+Environment: SDK_DIR, JOY_IMAGE_NAME, JOY_NODE_ID, JOY_SOURCE.
+EOF
+            exit 0
+            ;;
+        *) die "unknown option: $1" ;;
+    esac
 done
-rm -f "$OEM/etc/init.d/S96radiod" "$OEM/etc/init.d/S99unow-signal-diag"
 
-note "repacking firmware"
-( cd "$SDK_DIR" && ./build.sh firmware )
+sdk_init
+require_sdk
+require_file "$PROJECT_ROOT/firmware/pi4joy/opt/pi4joy/pi4joy"
 
-mkdir -p "$DIST"
-cp "$SDK_DIR/output/image/update.img" "$DIST/lcpi-joy.img"
-( cd "$DIST" && sha256sum lcpi-joy.img > lcpi-joy.img.sha256 )
-note "image: $DIST/lcpi-joy.img"
-cat "$DIST/lcpi-joy.img.sha256"
+if [ "$SKIP_PREPARE" -eq 0 ]; then
+    bash "$PROJECT_ROOT/scripts/prepare_joy.sh"
+fi
+if [ "$REPACK_ONLY" -eq 0 ]; then
+    note "building SDK (allsave)"
+    ( cd "$SDK_DIR" && CMAKE_POLICY_VERSION_MINIMUM=3.5 ./build.sh allsave )
+fi
+
+inject_joy_payload
+repack_joy_image

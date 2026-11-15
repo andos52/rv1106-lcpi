@@ -1,6 +1,11 @@
-#!/bin/sh
-# Force Pi4Joy identity on the board image: node_id=251 in every radiod.conf.
-set -e
-SDK="${SDK_DIR:-$HOME/rv1106-sdk/bort4g-radio}"
-find "$SDK" -name radiod.conf -type f -exec sed -i 's/^node_id=.*/node_id=251/' {} +
-find "$SDK" -name radiod.conf -type f -exec grep -H '^node_id=' {} +
+#!/usr/bin/env bash
+# Force the previous Pi4Joy identity in the SDK/image staging.
+
+set -euo pipefail
+LOG_PREFIX="set-joy-identity"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
+
+sdk_init
+require_sdk
+apply_joy_identity
+note "identity: node_id=$JOY_NODE_ID source=$JOY_SOURCE"

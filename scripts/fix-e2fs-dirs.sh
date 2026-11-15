@@ -1,11 +1,15 @@
 #!/bin/sh
-# Work around e2fsprogs 1.46.5 install with coreutils 9.x (Ubuntu 26.04):
-# its MKDIR_P does not honor DESTDIR, so pre-create destination dirs.
+# Work around e2fsprogs 1.46.5 with coreutils 9.x (Ubuntu 26.04): its MKDIR_P
+# does not honor DESTDIR, so pre-create the destination directories.
 # Idempotent; safe to run before any build.
 
-SDK="${SDK_DIR:-$HOME/rv1106-sdk/luxfox}"
-BR="$SDK/sysdrv/source/buildroot/buildroot-2023.02.6"
-SYSROOT="$BR/output/host/arm-buildroot-linux-uclibcgnueabihf/sysroot"
+SDK="${SDK_DIR:-$HOME/rv1106-sdk/bort4g-radio}"
+BR_ROOT="$SDK/sysdrv/source/buildroot"
+BR="$(find "$BR_ROOT" -maxdepth 1 -mindepth 1 -type d -name 'buildroot-*' 2>/dev/null | sort -V | tail -1)"
+BR="${BR:-$BR_ROOT/buildroot-2023.02.6}"
+HOST="$(find "$BR/output/host" -maxdepth 1 -mindepth 1 -type d -name 'arm-*' 2>/dev/null | head -1)"
+HOST="${HOST:-$BR/output/host/arm-buildroot-linux-uclibcgnueabihf}"
+SYSROOT="$HOST/sysroot"
 TARGET="$BR/output/target"
 
 DIRS="usr/lib usr/lib/pkgconfig usr/bin usr/sbin etc \

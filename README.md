@@ -58,7 +58,12 @@ board/dts/      LCPI DTS (Pro Max-база, RV1106G2, SPI NAND)
 configs/        image.example.json — только для bring-up (не радио)
 docs/           актуальная документация
 overlay/        bring-up overlay (Wi-Fi STA/vcpd), не используется в радио
-scripts/        prepare_radio.sh, build/flash, статус, фиксы сборки
+scripts/        prepare/build/flash, status, check, lib/common.sh
+```
+
+Проверка репозитория без SDK и платы:
+```bash
+./scripts/check.sh
 ```
 
 ## Статус

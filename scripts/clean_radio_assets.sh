@@ -1,25 +1,11 @@
 #!/usr/bin/env bash
-# Remove radio/telemetry assets so the firmware repack does not reinstall them.
+# Remove radio/telemetry assets that the media build would reinstall.
+
 set -euo pipefail
+LOG_PREFIX="clean-radio-assets"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
-SDK_DIR="${SDK_DIR:-$HOME/rv1106-sdk/bort4g-radio}"
-
-for f in \
-    "$SDK_DIR/media/out/root/etc/init.d/S96radiod" \
-    "$SDK_DIR/media/out/etc/init.d/S96radiod" \
-    "$SDK_DIR/media/out/bin/S99unow-signal-diag" \
-    "$SDK_DIR/media/radiod/out/root/etc/init.d/S96radiod" \
-    "$SDK_DIR/media/radiod/out/etc/init.d/S96radiod" \
-    "$SDK_DIR/media/unow/out/bin/S99unow-signal-diag" \
-    "$SDK_DIR/output/out/media_out/root/etc/init.d/S96radiod" \
-    "$SDK_DIR/output/out/media_out/etc/init.d/S96radiod" \
-    "$SDK_DIR/output/out/media_out/bin/S99unow-signal-diag"; do
-    rm -f "$f"
-done
-
-# Prevent a future media rebuild from putting them back.
-for f in "$SDK_DIR/media/radiod/scripts/S96radiod" "$SDK_DIR/media/unow/scripts/S99unow-signal-diag"; do
-    [ -f "$f" ] && mv "$f" "$f.disabled"
-done
-
-echo "clean-radio-assets: done"
+sdk_init
+require_sdk
+clean_radio_assets
+note "done"
