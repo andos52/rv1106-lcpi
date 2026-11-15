@@ -95,3 +95,4 @@ scripts/        prepare/build/flash, status, check, lib/common.sh
 - `docs/15-радио.md` — радио-прошивка дрона
 - `docs/16-сравнение-luckfox.md` — сравнение с Luckfox Pico Ultra
 - `docs/17-джойстики-надежность.md` — две проблемы и матрица проверок
+- `docs/18-нагрузка-джойстиков.md` — нагрузка, трафик, логи, зацепки
