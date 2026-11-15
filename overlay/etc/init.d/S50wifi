@@ -1,0 +1,46 @@
+#!/bin/sh
+# Bring up the USB Wi-Fi adapter as a station and apply the static IP.
+# Generated files: /etc/wpa_supplicant.conf, /etc/rv1106.network
+
+. /etc/rv1106.network 2>/dev/null || exit 0
+[ -n "$WIFI_DEV" ] || exit 0
+[ -f /etc/wpa_supplicant.conf ] || exit 0
+
+log() { logger -t rv1106-wifi "$*" 2>/dev/null || echo "rv1106-wifi: $*"; }
+
+modprobe ath9k_htc 2>/dev/null || true
+
+for _ in $(seq 1 30); do
+    [ -e "/sys/class/net/$WIFI_DEV" ] && break
+    sleep 1
+done
+if [ ! -e "/sys/class/net/$WIFI_DEV" ]; then
+    log "interface $WIFI_DEV not found"
+    exit 1
+fi
+
+ip link set "$WIFI_DEV" up
+
+if ! pidof wpa_supplicant >/dev/null 2>&1; then
+    wpa_supplicant -B -D nl80211 -i "$WIFI_DEV" -c /etc/wpa_supplicant.conf
+fi
+
+for _ in $(seq 1 20); do
+    if wpa_cli -i "$WIFI_DEV" status 2>/dev/null | grep -q "wpa_state=COMPLETED"; then
+        break
+    fi
+    sleep 1
+done
+
+if ! wpa_cli -i "$WIFI_DEV" status 2>/dev/null | grep -q "wpa_state=COMPLETED"; then
+    log "Wi-Fi association failed on $WIFI_DEV"
+    exit 1
+fi
+
+ip addr flush dev "$WIFI_DEV"
+ip addr add "$WIFI_IP/$WIFI_PREFIX" dev "$WIFI_DEV"
+ip link set "$WIFI_DEV" up
+ip route replace default via "$WIFI_GW" dev "$WIFI_DEV"
+
+log "connected: $WIFI_DEV $WIFI_IP/$WIFI_PREFIX gw $WIFI_GW"
+exit 0

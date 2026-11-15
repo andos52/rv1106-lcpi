@@ -1,0 +1,51 @@
+{
+  "project": {
+    "name": "rv1106-lcpi",
+    "version": "0.1.0",
+    "sdk": "usalko/luxfox"
+  },
+  "board": {
+    "model": "LCPI-RV1106_V1.4",
+    "boardId": "303RV1106G2",
+    "profile": "lcpi_rv1106",
+    "soc": "RV1106G2"
+  },
+  "node": {
+    "id": 3,
+    "callsign": "C-003"
+  },
+  "network": {
+    "wifiDev": "wlan0",
+    "ssid": "MASHA",
+    "psk": "CHANGE-ME-12345678",
+    "country": "RU",
+    "ip": "10.0.0.3",
+    "prefix": 24,
+    "gateway": "10.0.0.254",
+    "nsuHost": "10.0.0.254",
+    "ctrlPort": 5000,
+    "uvcpPort": 5002,
+    "ulamaPort": 5000
+  },
+  "camera": {
+    "device": "/dev/video0",
+    "sensor": "unknown",
+    "width": 640,
+    "height": 480,
+    "fps": 25
+  },
+  "video": {
+    "codec": "h265",
+    "bitrateKbps": 2000,
+    "gop": 25,
+    "idrIntervalMs": 1000,
+    "streamId": 1,
+    "dstNode": 254,
+    "autostart": false
+  },
+  "image": {
+    "hostname": "rv1106-003",
+    "rootPasswordHash": "",
+    "ssh": true
+  }
+}

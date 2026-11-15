@@ -1,0 +1,40 @@
+#!/bin/sh
+# Start pi4joy on RV1106 (Buildroot sysvinit).
+
+DAEMON=/opt/pi4joy/pi4joy
+ENV_FILE=/etc/pi4joy/env
+DATA_DIR=/userdata/pi4joy
+
+case "$1" in
+    start)
+        [ -x "$DAEMON" ] || exit 0
+        mkdir -p "$DATA_DIR" /var/log
+        [ -f "$ENV_FILE" ] && . "$ENV_FILE"
+        start-stop-daemon -S -q -b -x "$DAEMON" -- \
+            -listen 0.0.0.0:8090 \
+            -data-dir "$DATA_DIR" \
+            -profiles /opt/pi4joy/profiles \
+            -rate 20 \
+            -token "${PI4JOY_TOKEN:-}" \
+            -nsu "${PI4JOY_NSU_URL:-}" \
+            -nsu-token "${PI4JOY_NSU_TOKEN:-}" \
+            -nsu-source "${PI4JOY_NSU_SOURCE:-pi4joy-rv1106}" \
+            -nsu-rate "${PI4JOY_NSU_RATE:-50}" \
+            >>/var/log/pi4joy.log 2>&1
+        ;;
+    stop)
+        start-stop-daemon -K -q -x "$DAEMON"
+        ;;
+    restart)
+        "$0" stop
+        sleep 1
+        "$0" start
+        ;;
+    status)
+        pidof pi4joy >/dev/null 2>&1 && echo "running" || echo "stopped"
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status}"
+        exit 1
+        ;;
+esac

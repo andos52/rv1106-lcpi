@@ -1,0 +1,26 @@
+#!/bin/sh
+# Start the video daemon (vcpd) with the generated /etc/vcpd.conf.
+
+DAEMON=/oem/usr/bin/vcpd
+CONF=/etc/vcpd.conf
+
+case "$1" in
+    start)
+        [ -x "$DAEMON" ] || exit 0
+        [ -f "$CONF" ] || exit 0
+        mkdir -p /var/log
+        start-stop-daemon -S -q -b -x "$DAEMON" -- -C "$CONF" >>/var/log/vcpd.log 2>&1
+        ;;
+    stop)
+        start-stop-daemon -K -q -x "$DAEMON"
+        ;;
+    restart)
+        "$0" stop
+        sleep 1
+        "$0" start
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac

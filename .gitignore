@@ -1,0 +1,24 @@
+# build artifacts
+build/
+dist/
+sdk/
+*.img
+*.img.sha256
+*.log
+
+# local config (may contain Wi-Fi PSK)
+configs/image.json
+
+# python
+__pycache__/
+*.pyc
+
+# Windows
+Thumbs.db
+
+# local pi4joy identity (contains NSU token)
+firmware/pi4joy/etc/pi4joy/env
+
+# built cross-compiled binary (rebuild with firmware/pi4joy/README.md)
+firmware/pi4joy/opt/pi4joy/pi4joy
+
